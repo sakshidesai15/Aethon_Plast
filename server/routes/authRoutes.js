@@ -9,6 +9,8 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
+const REQUIRE_ADMIN_EMAIL_VERIFICATION =
+  String(process.env.REQUIRE_ADMIN_EMAIL_VERIFICATION || "false").toLowerCase() === "true";
 
 const parseAdminAccounts = () => {
   const raw = process.env.ADMIN_ACCOUNTS;
@@ -100,6 +102,15 @@ const sendVerificationCode = async (email, code) => {
     subject: "Admin verification code",
     text: `Your admin verification code is: ${code}. It expires in 10 minutes.`,
   });
+  return true;
+};
+
+const handleMissingSmtpVerification = async (admin) => {
+  if (REQUIRE_ADMIN_EMAIL_VERIFICATION) return false;
+  admin.isVerified = true;
+  admin.loginVerificationCodeHash = "";
+  admin.loginVerificationExpiresAt = null;
+  await admin.save();
   return true;
 };
 
@@ -197,6 +208,16 @@ router.post("/admin/signup", async (req, res) => {
     const code = generateVerificationCode();
     await saveVerificationCode(admin, code);
     const sent = await sendVerificationCode(email, code);
+    if (!sent) {
+      const autoVerified = await handleMissingSmtpVerification(admin);
+      if (autoVerified) {
+        return res.status(201).json({
+          message: "Admin created and verified (SMTP not configured).",
+          verificationRequired: false,
+          email,
+        });
+      }
+    }
     const payload = formatVerificationResponse("Verification code sent to your email.", sent, code);
 
     return res.status(sent ? 201 : 200).json({
@@ -227,10 +248,13 @@ router.post("/admin/resend-verification", async (req, res) => {
     const code = generateVerificationCode();
     await saveVerificationCode(admin, code);
     const sent = await sendVerificationCode(email, code);
-    const payload = formatVerificationResponse("Verification code sent to your email.", sent, code);
-    if (!sent && process.env.NODE_ENV === "production") {
-      return res.status(500).json(payload);
+    if (!sent) {
+      const autoVerified = await handleMissingSmtpVerification(admin);
+      if (autoVerified) {
+        return res.json({ message: "Admin verified (SMTP not configured)." });
+      }
     }
+    const payload = formatVerificationResponse("Verification code sent to your email.", sent, code);
     return res.json(payload);
   } catch (error) {
     return res.status(500).json({ message: "Failed to resend verification code" });
@@ -260,8 +284,21 @@ router.post("/admin/login", async (req, res) => {
       const code = generateVerificationCode();
       await saveVerificationCode(admin, code);
       const sent = await sendVerificationCode(admin.email, code);
+      if (!sent) {
+        const autoVerified = await handleMissingSmtpVerification(admin);
+        if (autoVerified) {
+          const token = jwt.sign({ email: admin.email, role: "admin", id: admin._id }, JWT_SECRET, {
+            expiresIn: "1d",
+          });
+          return res.json({
+            token,
+            admin: { email: admin.email, role: "admin", name: admin.name || "" },
+            message: "Logged in (SMTP not configured).",
+          });
+        }
+      }
       const payload = formatVerificationResponse("Verification required. Code sent to your email.", sent, code);
-      return res.status(sent ? 403 : process.env.NODE_ENV === "production" ? 500 : 403).json({
+      return res.status(403).json({
         ...payload,
         verificationRequired: true,
         email: admin.email,
