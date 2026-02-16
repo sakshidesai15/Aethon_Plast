@@ -223,6 +223,7 @@ export const api = {
   getMedia: () => request("/media"),
   uploadMedia: (formData) => request("/media/upload", { method: "POST", body: formData }),
   getLeads: () => request("/contact/leads"),
+  deleteLead: (id) => request(`/contact/leads/${id}`, { method: "DELETE" }),
   getAnalyticsOverview: () => request("/analytics/overview"),
   testEmail: (body) => request("/contact/test", { method: "POST", body: JSON.stringify(body) }),
 };

@@ -180,6 +180,23 @@ router.get("/leads", auth, async (req, res) => {
   }
 });
 
+// Admin route: delete a contact form lead
+router.delete("/leads/:id", auth, async (req, res) => {
+  try {
+    const { id } = req.params || {};
+    if (!id) {
+      return res.status(400).json({ message: "Lead id is required" });
+    }
+    const deleted = await ContactMessage.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+    return res.json({ message: "Lead deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to delete lead" });
+  }
+});
+
 // Admin route: send a test email with current settings
 router.post("/test", auth, async (req, res) => {
   try {

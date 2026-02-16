@@ -1392,6 +1392,7 @@ const DashboardPage = () => {
                     <th>Received</th>
                     <th>Status</th>
                     <th>Sent To</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1404,11 +1405,28 @@ const DashboardPage = () => {
                       <td>{lead.createdAt ? new Date(lead.createdAt).toLocaleString() : "-"}</td>
                       <td>{lead.mailStatus || "-"}</td>
                       <td>{lead.sentTo || "-"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => {
+                            if (!window.confirm("Delete this lead?")) return;
+                            api.deleteLead(lead._id)
+                              .then(() => {
+                                setLeads((prev) => prev.filter((item) => item._id !== lead._id));
+                                setMessage("Lead deleted");
+                              })
+                              .catch((error) => setMessage(error.message || "Failed to delete lead"));
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {leads.length === 0 ? (
                     <tr>
-                      <td colSpan="7">No leads found.</td>
+                      <td colSpan="8">No leads found.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -2098,7 +2116,7 @@ const DashboardPage = () => {
                 <div className="analytics-table">
                   {(analyticsData.topPages.length ? analyticsData.topPages : []).map((row) => (
                     <div key={row.path}>
-                      <span>{row.path}</span>
+                      <span>{row.path === "/" ? "Home" : row.path}</span>
                       <span>{analyticsLoading ? "..." : row.views}</span>
                     </div>
                   ))}
