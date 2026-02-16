@@ -10,7 +10,6 @@ const LoginPage = () => {
   const isResetMode = Boolean(resetToken);
 
   const [authMode, setAuthMode] = useState("login");
-  const primaryEmail = String(import.meta.env.VITE_PRIMARY_ADMIN_EMAIL || "").trim();
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -20,7 +19,7 @@ const LoginPage = () => {
   const [verifyEmail, setVerifyEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
 
-  const [forgotEmail, setForgotEmail] = useState(resetEmailFromUrl || primaryEmail);
+  const [forgotEmail, setForgotEmail] = useState(resetEmailFromUrl);
   const [newPassword, setNewPassword] = useState("");
   const [showForgotForm, setShowForgotForm] = useState(false);
 
@@ -50,7 +49,7 @@ const LoginPage = () => {
     clearMessages();
 
     try {
-      const response = await api.login(primaryEmail || loginEmail, loginPassword);
+      const response = await api.login(loginEmail, loginPassword);
       tokenStore.set(response.token);
       navigate("/", { replace: true });
     } catch (requestError) {
@@ -71,7 +70,21 @@ const LoginPage = () => {
 
   const handleSignup = async (event) => {
     event.preventDefault();
-    setError("Admin sign up is disabled. Please login with the primary admin account.");
+    setLoading(true);
+    clearMessages();
+
+    try {
+      const response = await api.signup(signupName, signupEmail, signupPassword);
+      setVerifyEmail(response.email || signupEmail);
+      setAuthMode("verify");
+      const codeHint = response.verificationCode ? ` Verification code: ${response.verificationCode}` : "";
+      setStatus((response.message || "Verification code sent.") + codeHint);
+      setSignupPassword("");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerify = async (event) => {
@@ -80,7 +93,7 @@ const LoginPage = () => {
     clearMessages();
 
     try {
-      const response = await api.verifyLogin(primaryEmail || verifyEmail, verificationCode);
+      const response = await api.verifyLogin(verifyEmail, verificationCode);
       tokenStore.set(response.token);
       navigate("/", { replace: true });
     } catch (requestError) {
@@ -94,7 +107,7 @@ const LoginPage = () => {
     setLoading(true);
     clearMessages();
     try {
-      const response = await api.resendVerification(primaryEmail || verifyEmail);
+      const response = await api.resendVerification(verifyEmail);
       const codeHint = response.verificationCode ? ` Verification code: ${response.verificationCode}` : "";
       setStatus((response.message || "Verification code sent.") + codeHint);
     } catch (requestError) {
@@ -110,7 +123,7 @@ const LoginPage = () => {
     clearMessages();
 
     try {
-      const response = await api.forgotPassword(primaryEmail || forgotEmail);
+      const response = await api.forgotPassword(forgotEmail);
       const baseMessage = response.message || "If this email exists, a reset link has been sent.";
       setStatus(response.resetLink ? `${baseMessage} ${response.resetLink}` : baseMessage);
     } catch (requestError) {
@@ -126,7 +139,7 @@ const LoginPage = () => {
     clearMessages();
 
     try {
-      const emailForReset = resetEmailFromUrl || primaryEmail || forgotEmail;
+      const emailForReset = resetEmailFromUrl || forgotEmail;
       const response = await api.resetPassword(emailForReset, resetToken, newPassword);
       setStatus(response.message || "Password reset successful. Please login.");
       setNewPassword("");
@@ -171,7 +184,7 @@ const LoginPage = () => {
             <button type="button" onClick={() => { setAuthMode("login"); clearMessages(); }}>
               Login
             </button>
-            <button type="button" disabled>
+            <button type="button" onClick={() => { setAuthMode("signup"); clearMessages(); }}>
               Sign Up
             </button>
           </div>
@@ -223,10 +236,9 @@ const LoginPage = () => {
             <input
               type="email"
               placeholder="Admin email"
-              value={primaryEmail || verifyEmail}
+              value={verifyEmail}
               onChange={(event) => setVerifyEmail(event.target.value)}
               required
-              disabled={Boolean(primaryEmail)}
             />
             <input
               type="text"
@@ -241,10 +253,9 @@ const LoginPage = () => {
             <input
               type="email"
               placeholder="Admin email"
-              value={primaryEmail || loginEmail}
+              value={loginEmail}
               onChange={(event) => setLoginEmail(event.target.value)}
               required
-              disabled={Boolean(primaryEmail)}
             />
             <input
               type="password"
@@ -293,10 +304,9 @@ const LoginPage = () => {
                 <input
                   type="email"
                   placeholder="Enter admin email"
-                  value={primaryEmail || forgotEmail}
+                  value={forgotEmail}
                   onChange={(event) => setForgotEmail(event.target.value)}
                   required
-                  disabled={Boolean(primaryEmail)}
                 />
                 <button type="button" onClick={handleForgotPassword} disabled={loading || !forgotEmail}>
                   Send Reset Link

@@ -11,9 +11,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
 const REQUIRE_ADMIN_EMAIL_VERIFICATION =
   String(process.env.REQUIRE_ADMIN_EMAIL_VERIFICATION || "false").toLowerCase() === "true";
-const PRIMARY_ADMIN_ONLY =
-  String(process.env.PRIMARY_ADMIN_ONLY || "false").toLowerCase() === "true";
-const PRIMARY_ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
 
 const parseAdminAccounts = () => {
   const raw = process.env.ADMIN_ACCOUNTS;
@@ -134,9 +131,6 @@ const formatVerificationResponse = (baseMessage, codeSent, code) => {
   return { message: "Email is not configured. Set SMTP credentials in server .env." };
 };
 
-const isPrimaryEmail = (email) =>
-  PRIMARY_ADMIN_EMAIL && String(email || "").trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;
-
 router.get("/admins", auth, async (req, res) => {
   try {
     await ensureSeedAdmins();
@@ -184,65 +178,6 @@ router.delete("/admins/:id", auth, async (req, res) => {
 });
 
 router.post("/admin/signup", async (req, res) => {
-  try {
-    await ensureSeedAdmins();
-
-    return res.status(403).json({
-      message: "Admin sign up is disabled. Please login with the primary admin account.",
-    });
-
-    const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-
-    const existing = await Admin.findOne({ email });
-    if (existing) {
-      return res.status(409).json({ message: "Admin account already exists for this email" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const admin = await Admin.create({
-      name,
-      email,
-      passwordHash,
-      isVerified: false,
-      loginVerificationCodeHash: "",
-      loginVerificationExpiresAt: null,
-    });
-
-    const code = generateVerificationCode();
-    await saveVerificationCode(admin, code);
-    const sent = await sendVerificationCode(email, code);
-    if (!sent) {
-      const autoVerified = await handleMissingSmtpVerification(admin);
-      if (autoVerified) {
-        return res.status(201).json({
-          message: "Admin created and verified (SMTP not configured).",
-          verificationRequired: false,
-          email,
-        });
-      }
-    }
-    const payload = formatVerificationResponse("Verification code sent to your email.", sent, code);
-
-    return res.status(sent ? 201 : 200).json({
-      ...payload,
-      verificationRequired: true,
-      email,
-    });
-  } catch (error) {
-    return res.status(500).json({ message: "Failed to create admin account" });
-  }
-});
-
-router.post("/admins", auth, async (req, res) => {
   try {
     await ensureSeedAdmins();
 
@@ -303,9 +238,6 @@ router.post("/admin/resend-verification", async (req, res) => {
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
-    if (PRIMARY_ADMIN_ONLY && !isPrimaryEmail(email)) {
-      return res.status(403).json({ message: "Only the primary admin can use this action." });
-    }
 
     const admin = await Admin.findOne({ email });
     if (!admin) {
@@ -338,9 +270,6 @@ router.post("/admin/login", async (req, res) => {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
-    }
-    if (PRIMARY_ADMIN_ONLY && !isPrimaryEmail(email)) {
-      return res.status(403).json({ message: "Only the primary admin can log in." });
     }
 
     const admin = await Admin.findOne({ email: String(email).trim().toLowerCase() });
@@ -398,9 +327,6 @@ router.post("/admin/verify-login", async (req, res) => {
     if (!email || !code) {
       return res.status(400).json({ message: "Email and verification code are required" });
     }
-    if (PRIMARY_ADMIN_ONLY && !isPrimaryEmail(email)) {
-      return res.status(403).json({ message: "Only the primary admin can verify login." });
-    }
 
     const admin = await Admin.findOne({
       email,
@@ -441,9 +367,6 @@ router.post("/admin/forgot-password", async (req, res) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
-    }
-    if (PRIMARY_ADMIN_ONLY && !isPrimaryEmail(email)) {
-      return res.status(403).json({ message: "Only the primary admin can reset password." });
     }
 
     const admin = await Admin.findOne({ email });
@@ -495,9 +418,6 @@ router.post("/admin/reset-password", async (req, res) => {
 
     if (!email || !token || !newPassword) {
       return res.status(400).json({ message: "Email, token, and new password are required" });
-    }
-    if (PRIMARY_ADMIN_ONLY && !isPrimaryEmail(email)) {
-      return res.status(403).json({ message: "Only the primary admin can reset password." });
     }
 
     if (newPassword.length < 6) {
