@@ -152,6 +152,11 @@ export const api = {
     body: JSON.stringify({ email, token, newPassword }),
   }),
   getAdmins: () => request("/auth/admins"),
+  createAdmin: (name, email, password) =>
+    request("/auth/admins", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
+    }),
   deleteAdmin: (id) => request(`/auth/admins/${id}`, { method: "DELETE" }),
 
   getUsers: () =>

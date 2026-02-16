@@ -275,6 +275,7 @@ const DashboardPage = () => {
 
   const [users, setUsers] = useState([]);
   const [admins, setAdmins] = useState([]);
+  const [newAdmin, setNewAdmin] = useState({ name: "", email: "", password: "" });
   const [visitors, setVisitors] = useState([]);
   const [leads, setLeads] = useState([]);
   const [products, setProducts] = useState([]);
@@ -991,6 +992,22 @@ const DashboardPage = () => {
     }
   };
 
+  const createAdmin = async (event) => {
+    event.preventDefault();
+    try {
+      if (!newAdmin.email || !newAdmin.password) {
+        setMessage("Admin email and password are required");
+        return;
+      }
+      await api.createAdmin(newAdmin.name, newAdmin.email, newAdmin.password);
+      setMessage("Admin created. Verification may be required.");
+      setNewAdmin({ name: "", email: "", password: "" });
+      await fetchDashboardData();
+    } catch (error) {
+      setMessage(error.message || "Failed to create admin");
+    }
+  };
+
   return (
     <div className="dashboard-layout">
       <aside className="sidebar">
@@ -1423,6 +1440,29 @@ const DashboardPage = () => {
               <h3>Admin Accounts</h3>
               <small>Total admins: {admins.length}</small>
             </div>
+            <form className="panel-form" onSubmit={createAdmin}>
+              <h4>Create New Admin</h4>
+              <input
+                placeholder="Full name"
+                value={newAdmin.name}
+                onChange={(event) => setNewAdmin((prev) => ({ ...prev, name: event.target.value }))}
+              />
+              <input
+                type="email"
+                placeholder="Admin email"
+                value={newAdmin.email}
+                onChange={(event) => setNewAdmin((prev) => ({ ...prev, email: event.target.value }))}
+                required
+              />
+              <input
+                type="password"
+                placeholder="Temporary password"
+                value={newAdmin.password}
+                onChange={(event) => setNewAdmin((prev) => ({ ...prev, password: event.target.value }))}
+                required
+              />
+              <button type="submit">Create Admin</button>
+            </form>
             <div className="table-wrap">
               <table>
                 <thead>
