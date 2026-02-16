@@ -1975,14 +1975,8 @@ const DashboardPage = () => {
                       .then(() => {
                         setEmailSettings((prev) => ({
                           ...prev,
+                          ...payload,
                           contactRecipients: payload.contactRecipients,
-                          contactFromEmail: "",
-                          contactFromName: "",
-                          smtpHost: "",
-                          smtpPort: "",
-                          smtpSecure: "false",
-                          smtpUser: "",
-                          smtpPass: "",
                         }));
                         setNewRecipient("");
                         setEmailErrors({});
