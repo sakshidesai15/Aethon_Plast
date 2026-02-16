@@ -8,9 +8,9 @@ export const CONTACT_INFO = {
 };
 
 export const SOCIAL_LINKS = {
-    FACEBOOK: 'https://facebook.com',
+    FACEBOOK: 'https://www.facebook.com/share/188jqYEmBX/',
     INSTAGRAM: 'https://instagram.com',
-    LINKEDIN: 'https://linkedin.com'
+    LINKEDIN: 'https://www.linkedin.com/company/aethon-plast/'
 };
 
 export const NAV_LINKS = [

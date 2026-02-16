@@ -210,9 +210,9 @@ const emptySiteSettings = {
   footerDescription:
     "Leading manufacturer of high-quality plastic packaging solutions. We serve industries globally with innovation and integrity.",
   socialLinks: {
-    FACEBOOK: "https://facebook.com",
+    FACEBOOK: "https://www.facebook.com/share/188jqYEmBX/",
     INSTAGRAM: "https://instagram.com",
-    LINKEDIN: "https://linkedin.com",
+    LINKEDIN: "https://www.linkedin.com/company/aethon-plast/",
   },
   developerName: "@Semixon",
   developerUrl: "https://semixon.com",
