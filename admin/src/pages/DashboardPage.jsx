@@ -73,6 +73,22 @@ const fallbackOurSegments = [
       "Our packaging for nutraceuticals and supplements combines protection with shelf appeal.",
     features: ["UV Protection", "Tamper-Evident Seals", "Custom Colors"],
   },
+  {
+    id: "cosmetics",
+    title: "Cosmetics",
+    image: "/assets/pharma_banner_bottles_1769614352905.png",
+    description:
+      "Premium packaging solutions for the beauty and personal care industry with elegant, functional containers.",
+    features: ["High-Quality Finish", "Custom Shapes", "Brand Customization"],
+  },
+  {
+    id: "fmcg",
+    title: "FMCG",
+    image: "/assets/pharma_banner_production_retry_1769615616299.png",
+    description:
+      "Durable and cost-effective packaging for fast-moving consumer goods across household and food products.",
+    features: ["High Volume Production", "Cost-Effective", "Durable Design"],
+  },
 ];
 
 const fallbackSlides = [
@@ -439,7 +455,17 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (contentByKey.marketSegments?.data) setMarketSegments(contentByKey.marketSegments.data);
-    if (contentByKey.ourSegments?.data) setOurSegments(contentByKey.ourSegments.data);
+    if (contentByKey.ourSegments?.data) {
+      const incoming = Array.isArray(contentByKey.ourSegments.data)
+        ? contentByKey.ourSegments.data
+        : [];
+      const incomingMap = new Map(incoming.map((item) => [String(item.id), item]));
+      const merged = fallbackOurSegments.map((item) => incomingMap.get(String(item.id)) || item);
+      const extra = incoming.filter(
+        (item) => !fallbackOurSegments.some((base) => String(base.id) === String(item.id))
+      );
+      setOurSegments([...merged, ...extra]);
+    }
     if (contentByKey.homePage?.data) {
       const incoming = contentByKey.homePage.data;
       if (Array.isArray(incoming.slides) && incoming.slides.length) setHomeSlides(incoming.slides);
