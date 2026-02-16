@@ -66,6 +66,7 @@ const createTransporter = () => {
     return nodemailer.createTransport({
       service: "gmail",
       auth: { user, pass },
+      dns: { family: 4 },
     });
   }
 
@@ -80,6 +81,7 @@ const createTransporter = () => {
     port,
     secure,
     auth: { user, pass },
+    dns: { family: 4 },
   });
 };
 

@@ -30,6 +30,7 @@ const getTransporter = (settings) => {
       port: parsePort(settings?.smtpPort || process.env.SMTP_PORT, 587),
       secure: String(settings?.smtpSecure || process.env.SMTP_SECURE || "false").toLowerCase() === "true",
       auth: { user, pass },
+      dns: { family: 4 },
     });
   }
 
@@ -39,6 +40,7 @@ const getTransporter = (settings) => {
     return nodemailer.createTransport({
       service: "gmail",
       auth: { user: gmailUser, pass: gmailPass },
+      dns: { family: 4 },
     });
   }
 
