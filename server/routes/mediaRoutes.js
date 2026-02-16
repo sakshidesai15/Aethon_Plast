@@ -45,4 +45,22 @@ router.post("/upload", auth, upload.single("image"), async (req, res) => {
   });
 });
 
+router.delete("/:name", auth, async (req, res) => {
+  try {
+    const rawName = req.params?.name || "";
+    const safeName = path.basename(rawName);
+    if (!safeName) {
+      return res.status(400).json({ message: "File name is required" });
+    }
+    const filePath = path.join(uploadDir, safeName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+    fs.unlinkSync(filePath);
+    return res.json({ message: "File deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to delete media" });
+  }
+});
+
 module.exports = router;

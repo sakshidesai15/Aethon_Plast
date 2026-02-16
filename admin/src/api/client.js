@@ -222,6 +222,7 @@ export const api = {
 
   getMedia: () => request("/media"),
   uploadMedia: (formData) => request("/media/upload", { method: "POST", body: formData }),
+  deleteMedia: (name) => request(`/media/${encodeURIComponent(name)}`, { method: "DELETE" }),
   getLeads: () => request("/contact/leads"),
   deleteLead: (id) => request(`/contact/leads/${id}`, { method: "DELETE" }),
   getAnalyticsOverview: () => request("/analytics/overview"),

@@ -2156,11 +2156,28 @@ const DashboardPage = () => {
               <input type="file" onChange={uploadImage} />
               <small>Upload image and use URL like /uploads/filename in content sections.</small>
             </div>
-            <table><thead><tr><th>Image URL</th><th>Preview</th></tr></thead><tbody>
+            <table><thead><tr><th>Image URL</th><th>Preview</th><th>Actions</th></tr></thead><tbody>
               {mediaFiles.map((file) => (
                 <tr key={file.name}>
                   <td>{file.url}</td>
                   <td><img src={resolveImageUrl(file.url)} alt={file.name} /></td>
+                  <td>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        if (!window.confirm("Delete this media file?")) return;
+                        api.deleteMedia(file.name)
+                          .then(() => {
+                            setMediaFiles((prev) => prev.filter((item) => item.name !== file.name));
+                            setMessage("Media deleted");
+                          })
+                          .catch((error) => setMessage(error.message || "Failed to delete media"));
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody></table>
