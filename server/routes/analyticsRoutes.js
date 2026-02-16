@@ -27,8 +27,24 @@ router.get("/overview", auth, async (req, res) => {
         { name: "activeUsers" },
         { name: "sessions" },
         { name: "screenPageViews" },
-        { name: "conversions" },
       ],
+    });
+
+    const [conversionsResponse] = await client.runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "eventCount" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          stringFilter: {
+            matchType: "EXACT",
+            value: "contact_submit",
+          },
+        },
+      },
+      limit: 1,
     });
 
     const [countriesResponse] = await client.runReport({
@@ -50,12 +66,13 @@ router.get("/overview", auth, async (req, res) => {
     });
 
     const summaryRow = summaryResponse.rows?.[0]?.metricValues || [];
+    const conversionsRow = conversionsResponse.rows?.[0]?.metricValues || [];
     const summary = {
       totalUsers: Number(summaryRow[0]?.value || 0),
       activeUsers: Number(summaryRow[1]?.value || 0),
       sessions: Number(summaryRow[2]?.value || 0),
       pageViews: Number(summaryRow[3]?.value || 0),
-      conversions: Number(summaryRow[4]?.value || 0),
+      conversions: Number(conversionsRow[0]?.value || 0),
     };
 
     const topCountries = (countriesResponse.rows || []).map((row) => ({
