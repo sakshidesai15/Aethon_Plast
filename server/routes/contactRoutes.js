@@ -19,6 +19,35 @@ const parsePort = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const sendWithResend = async ({ from, to, subject, text, html, replyTo }) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, reason: "missing_key" };
+
+  const payload = {
+    from,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    text,
+    html,
+  };
+  if (replyTo) payload.reply_to = replyTo;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    return { ok: false, reason: "api_error", message };
+  }
+  return { ok: true };
+};
+
 const getTransporter = (settings) => {
   const host = settings?.smtpHost || process.env.SMTP_HOST;
   const user = settings?.smtpUser || process.env.SMTP_USER;
@@ -88,20 +117,37 @@ router.post("/send", async (req, res) => {
 
     const fromEmail = senderEmail;
 
-    await transporter.sendMail({
-      from: fromValue,
-      to: receiverList,
-      replyTo: email,
-      subject: `Website Contact: ${subject}`,
-      text: `Name: ${fullName}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`,
-      html: `
+    const emailText = `Name: ${fullName}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`;
+    const emailHtml = `
         <h3>New Contact Form Message</h3>
         <p><strong>Name:</strong> ${fullName}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Subject:</strong> ${subject}</p>
         <p><strong>Message:</strong><br/>${String(message).replace(/\n/g, "<br/>")}</p>
-      `,
+      `;
+
+    const resendResult = await sendWithResend({
+      from: fromValue,
+      to: receiverList,
+      subject: `Website Contact: ${subject}`,
+      text: emailText,
+      html: emailHtml,
+      replyTo: email,
     });
+
+    if (!resendResult.ok) {
+      if (!transporter) {
+        throw new Error(resendResult.message || "Resend API error");
+      }
+      await transporter.sendMail({
+        from: fromValue,
+        to: receiverList,
+        replyTo: email,
+        subject: `Website Contact: ${subject}`,
+        text: emailText,
+        html: emailHtml,
+      });
+    }
 
     doc.mailStatus = "sent";
     doc.sentAt = new Date();
@@ -146,13 +192,6 @@ router.post("/test", auth, async (req, res) => {
       return res.status(400).json({ message: "Recipient email is required for test." });
     }
 
-    const transporter = getTransporter(emailSettings);
-    if (!transporter) {
-      return res.status(400).json({
-        message: "SMTP is not configured. Set host, port, user, and password in Email Settings.",
-      });
-    }
-
     const senderEmail =
       emailSettings.contactFromEmail ||
       process.env.CONTACT_FROM_EMAIL ||
@@ -162,12 +201,29 @@ router.post("/test", auth, async (req, res) => {
     const senderName = String(emailSettings.contactFromName || "").trim();
     const fromValue = senderName ? `${senderName} <${senderEmail}>` : senderEmail;
 
-    await transporter.sendMail({
+    const resendResult = await sendWithResend({
       from: fromValue,
       to: target,
       subject: "Test email from Aethon Plast",
       text: "This is a test email to verify SMTP settings.",
     });
+
+    if (!resendResult.ok) {
+      const transporter = getTransporter(emailSettings);
+      if (!transporter) {
+        return res.status(400).json({
+          message:
+            resendResult.message ||
+            "SMTP is not configured. Set host, port, user, and password in Email Settings.",
+        });
+      }
+      await transporter.sendMail({
+        from: fromValue,
+        to: target,
+        subject: "Test email from Aethon Plast",
+        text: "This is a test email to verify SMTP settings.",
+      });
+    }
 
     return res.json({ message: "Test email sent successfully." });
   } catch (error) {
