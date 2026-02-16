@@ -62,9 +62,18 @@ const fallbackHomeContent = {
 
 const Home = () => {
     const { data: homeContent } = useContentData('homePage', fallbackHomeContent);
-    const slides = Array.isArray(homeContent?.slides) && homeContent.slides.length > 0
-        ? homeContent.slides
-        : fallbackHomeContent.slides;
+    const rawSlides = Array.isArray(homeContent?.slides) ? homeContent.slides : [];
+    const slides = rawSlides.length >= fallbackHomeContent.slides.length
+        ? rawSlides
+        : [
+            ...fallbackHomeContent.slides.map((fallbackSlide) => {
+                const match = rawSlides.find((slide) => String(slide.id) === String(fallbackSlide.id));
+                return match ? { ...fallbackSlide, ...match } : fallbackSlide;
+            }),
+            ...rawSlides.filter(
+                (slide) => !fallbackHomeContent.slides.find((fb) => String(fb.id) === String(slide.id))
+            ),
+        ];
     const features = Array.isArray(homeContent?.features) && homeContent.features.length > 0
         ? homeContent.features
         : fallbackHomeContent.features;

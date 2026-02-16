@@ -23,19 +23,17 @@
 }
 
 .segments-container {
-    display: flex;
-    flex-direction: column;
-    gap: 60px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 28px;
     padding-bottom: 80px;
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
 }
 
 .segment-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
     background: white;
     border-radius: 20px;
     overflow: hidden;
@@ -43,20 +41,13 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid #f1f5f9;
     opacity: 0;
-    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.segment-row:nth-child(odd) {
-    transform: translateX(-100px);
-}
-
-.segment-row:nth-child(even) {
-    transform: translateX(100px);
+    transform: translateY(20px);
+    transition: all 0.6s ease;
 }
 
 .segment-row.visible {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
 }
 
 .segment-row:hover {
@@ -64,17 +55,8 @@
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
 
-.segment-row.reverse {
-    direction: rtl;
-}
-
-.segment-row.reverse .segment-content {
-    direction: ltr;
-}
-
 .segment-image {
-    height: 100%;
-    min-height: 350px;
+    height: 200px;
     width: 100%;
     border-radius: 0;
     box-shadow: none;
@@ -92,7 +74,7 @@
 }
 
 .segment-content {
-    padding: 30px;
+    padding: 22px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -109,16 +91,16 @@
 }
 
 .segment-content h2 {
-    font-size: 1.8rem;
+    font-size: 1.35rem;
     color: var(--text-dark);
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .segment-content p {
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
     line-height: 1.6;
-    margin-bottom: 25px;
+    margin-bottom: 18px;
     flex-grow: 1;
 }
 
@@ -126,8 +108,8 @@
     list-style: none;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
+    grid-template-columns: 1fr;
+    gap: 10px;
 }
 
 .segment-features li {
@@ -146,32 +128,16 @@
 }
 
 @media (max-width: 900px) {
-    .segment-row {
-        grid-template-columns: 1fr;
-        gap: 0;
-        border-radius: 16px;
-    }
-
-    .segment-row:nth-child(odd),
-    .segment-row:nth-child(even) {
-        transform: translateY(50px);
-    }
-
-    .segment-row.visible {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
     .segment-image {
         height: 250px;
     }
 
     .segment-content {
-        padding: 24px;
+        padding: 20px;
     }
 
     .segment-content h2 {
-        font-size: 1.75rem;
+        font-size: 1.25rem;
     }
 }
 
@@ -182,10 +148,6 @@
 
     .serve-header h1 {
         font-size: 2.2rem;
-    }
-
-    .segments-container {
-        gap: 40px;
     }
 
     .segment-content {

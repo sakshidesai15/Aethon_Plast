@@ -106,6 +106,13 @@ const fallbackSlides = [
     subtitle: "State-of-the-Art Technology",
     text: "Precision engineering and clean-room facilities ensuring highest hygiene standards.",
   },
+  {
+    id: 3,
+    image: "/assets/pharma_banner_caps_retry_1769615514861.png",
+    title: "Innovative Solutions",
+    subtitle: "Custom Caps & Closures",
+    text: "Tailored designs to enhance brand identity and ensure product safety.",
+  },
 ];
 
 const emptyMarket = { id: "", name: "", image: "", description: "", tag: "" };
@@ -246,6 +253,20 @@ const toKey = (raw) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+
+const mergeSlides = (incoming = [], fallback = []) => {
+  const safeIncoming = Array.isArray(incoming) ? incoming : [];
+  const safeFallback = Array.isArray(fallback) ? fallback : [];
+  if (safeIncoming.length === 0) return safeFallback;
+  const merged = safeFallback.map((fb) => {
+    const match = safeIncoming.find((slide) => String(slide.id) === String(fb.id));
+    return match ? { ...fb, ...match } : fb;
+  });
+  const extras = safeIncoming.filter(
+    (slide) => !safeFallback.find((fb) => String(fb.id) === String(slide.id))
+  );
+  return merged.concat(extras);
+};
 
 const DashboardPage = () => {
   const [active, setActive] = useState("homeSlides");
@@ -468,7 +489,9 @@ const DashboardPage = () => {
     }
     if (contentByKey.homePage?.data) {
       const incoming = contentByKey.homePage.data;
-      if (Array.isArray(incoming.slides) && incoming.slides.length) setHomeSlides(incoming.slides);
+      if (Array.isArray(incoming.slides) && incoming.slides.length) {
+        setHomeSlides(mergeSlides(incoming.slides, fallbackSlides));
+      }
       setHomeExtra({
         ...emptyHomeExtra,
         ...incoming,
