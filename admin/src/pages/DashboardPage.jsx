@@ -655,19 +655,30 @@ const DashboardPage = () => {
     setMessage("Our segment changed locally. Click Save Our Segments.");
   };
 
+  const getNextSlideId = () => {
+    const numericIds = homeSlides
+      .map((item) => Number(item.id))
+      .filter((value) => Number.isFinite(value));
+    const maxId = numericIds.length ? Math.max(...numericIds) : 0;
+    return String(maxId + 1);
+  };
+
   const addOrUpdateSlide = (event) => {
     event.preventDefault();
-    const payload = { ...slideForm, id: Number(slideForm.id) || slideForm.id };
+    const trimmedId = String(slideForm.id || "").trim();
+    const resolvedId = trimmedId ? (Number(trimmedId) || trimmedId) : getNextSlideId();
+    const payload = { ...slideForm, id: resolvedId };
     const index = homeSlides.findIndex((item) => String(item.id) === String(payload.id));
     if (index >= 0) {
       const copy = [...homeSlides];
       copy[index] = payload;
       setHomeSlides(copy);
+      setMessage("Slide updated locally. Click Save Home Page.");
     } else {
       setHomeSlides((prev) => [...prev, payload]);
+      setMessage("Slide added locally. Click Save Home Page.");
     }
     setSlideForm(emptySlide);
-    setMessage("Slide changed locally. Click Save Home Slides.");
   };
 
   const saveCatalogJson = async () => {
@@ -1463,7 +1474,7 @@ const DashboardPage = () => {
             <section className="catalog-card">
               <form className="panel-form" onSubmit={addOrUpdateSlide}>
                 <h3>Hero Slides (Title + Subtitle + Description)</h3>
-                <input placeholder="Slide id" value={slideForm.id} onChange={(e) => setSlideForm((s) => ({ ...s, id: e.target.value }))} required />
+                <input placeholder="Slide id (leave blank for auto)" value={slideForm.id} onChange={(e) => setSlideForm((s) => ({ ...s, id: e.target.value }))} />
                 <input
                   type="file"
                   accept="image/*"
