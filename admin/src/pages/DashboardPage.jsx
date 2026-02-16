@@ -120,13 +120,13 @@ const emptyContactContent = {
   phoneTitle: "Phone",
   emailTitle: "Email",
   contactInfo: {
-    phone: "",
-    whatsapp: "",
-    email: "",
-    address: "",
-    mapLink: "",
+    phone: "9000386555",
+    whatsapp: "919000386555",
+    email: "info@aethonplast.com",
+    address: "AGM Chambers, 390/A, 446/15/E, Sai Colony, R.C Puram, Sangareddy District, 502032, Telangana",
+    mapLink: "https://maps.app.goo.gl/rFa3mJ4pW65ThcCu7",
   },
-  subjects: ["Product Inquiry", "Custom Packaging", "Bulk Order", "Support"],
+  subjects: ["Product Inquiry", "Custom Mold Request", "Other"],
 };
 const emptyHomeExtra = {
   features: [
