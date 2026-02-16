@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const Admin = require("../models/Admin");
+const Content = require("../models/Content");
 const auth = require("../middleware/auth");
 
 const router = express.Router();
@@ -11,6 +12,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
 const REQUIRE_ADMIN_EMAIL_VERIFICATION =
   String(process.env.REQUIRE_ADMIN_EMAIL_VERIFICATION || "false").toLowerCase() === "true";
+const DEFAULT_PRIMARY_ADMIN_EMAIL = "aethonplast@gmail.com";
+const DEFAULT_PRIMARY_ADMIN_PASSWORD = "aethonplast@2026";
+const DEFAULT_PRIMARY_ADMIN_NAME = "Primary Admin";
 
 const parseAdminAccounts = () => {
   const raw = process.env.ADMIN_ACCOUNTS;
@@ -25,16 +29,14 @@ const parseAdminAccounts = () => {
 
 const ensureSeedAdmins = async () => {
   const fromList = parseAdminAccounts();
-  const singleSeed =
-    process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD
-      ? [
-          {
-            email: process.env.ADMIN_EMAIL,
-            password: process.env.ADMIN_PASSWORD,
-            name: process.env.ADMIN_NAME || "Admin",
-          },
-        ]
-      : [];
+  const singleSeed = [
+    {
+      email: process.env.ADMIN_EMAIL || DEFAULT_PRIMARY_ADMIN_EMAIL,
+      password: process.env.ADMIN_PASSWORD || DEFAULT_PRIMARY_ADMIN_PASSWORD,
+      name: process.env.ADMIN_NAME || DEFAULT_PRIMARY_ADMIN_NAME,
+      forceSync: true,
+    },
+  ];
 
   const seeds = fromList && fromList.length > 0 ? fromList : singleSeed;
 
@@ -42,7 +44,30 @@ const ensureSeedAdmins = async () => {
     if (!seed?.email || !seed?.password) continue;
     const normalizedEmail = String(seed.email).trim().toLowerCase();
     const existing = await Admin.findOne({ email: normalizedEmail });
-    if (existing) continue;
+    if (existing) {
+      if (seed.forceSync) {
+        const passwordMatches = await bcrypt.compare(String(seed.password), existing.passwordHash);
+        let shouldSave = false;
+        if (!passwordMatches) {
+          existing.passwordHash = await bcrypt.hash(String(seed.password), 10);
+          shouldSave = true;
+        }
+        if ((existing.name || "") !== String(seed.name || "")) {
+          existing.name = String(seed.name || "");
+          shouldSave = true;
+        }
+        if (existing.isVerified !== true) {
+          existing.isVerified = true;
+          shouldSave = true;
+        }
+        if (shouldSave) {
+          existing.loginVerificationCodeHash = "";
+          existing.loginVerificationExpiresAt = null;
+          await existing.save();
+        }
+      }
+      continue;
+    }
 
     const passwordHash = await bcrypt.hash(String(seed.password), 10);
     await Admin.create({
@@ -56,10 +81,19 @@ const ensureSeedAdmins = async () => {
   }
 };
 
-const createTransporter = () => {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+const getEmailSettings = async () => {
+  try {
+    const doc = await Content.findOne({ key: "emailSettings" });
+    return doc?.data || {};
+  } catch {
+    return {};
+  }
+};
+
+const createTransporter = (settings = {}) => {
+  const host = settings.smtpHost || process.env.SMTP_HOST;
+  const user = settings.smtpUser || process.env.SMTP_USER || process.env.EMAIL_USER;
+  const pass = settings.smtpPass || process.env.SMTP_PASS || process.env.EMAIL_PASS;
   if (!user || !pass) return null;
 
   if (!host) {
@@ -70,9 +104,11 @@ const createTransporter = () => {
     });
   }
 
-  const port = Number(process.env.SMTP_PORT || 587);
+  const port = Number(settings.smtpPort || process.env.SMTP_PORT || 587);
   const secure =
-    process.env.SMTP_SECURE != null
+    settings.smtpSecure != null
+      ? String(settings.smtpSecure).toLowerCase() === "true"
+      : process.env.SMTP_SECURE != null
       ? String(process.env.SMTP_SECURE).toLowerCase() === "true"
       : port === 465;
 
@@ -85,6 +121,49 @@ const createTransporter = () => {
   });
 };
 
+const getResendApiKey = (settings = {}) => {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY;
+  const host = String(settings.smtpHost || process.env.SMTP_HOST || "").toLowerCase();
+  const user = String(settings.smtpUser || process.env.SMTP_USER || "").toLowerCase();
+  const pass = String(settings.smtpPass || process.env.SMTP_PASS || "");
+  if (host.includes("resend.com") && user === "resend" && pass) {
+    return pass;
+  }
+  return "";
+};
+
+const sendWithResend = async ({ to, subject, text, html, settings = {} }) => {
+  const apiKey = getResendApiKey(settings);
+  if (!apiKey) return false;
+
+  const from =
+    settings.contactFromEmail ||
+    process.env.CONTACT_FROM_EMAIL ||
+    settings.smtpUser ||
+    process.env.SMTP_USER ||
+    process.env.EMAIL_USER;
+  if (!from) return false;
+
+  const payload = {
+    from,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    text,
+    html,
+  };
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return response.ok;
+};
+
 const generateVerificationCode = () =>
   String(Math.floor(100000 + Math.random() * 900000));
 
@@ -95,11 +174,25 @@ const saveVerificationCode = async (admin, code) => {
 };
 
 const sendVerificationCode = async (email, code) => {
-  const transporter = createTransporter();
+  const settings = await getEmailSettings();
+  const sentViaResend = await sendWithResend({
+    to: email,
+    subject: "Admin verification code",
+    text: `Your admin verification code is: ${code}. It expires in 10 minutes.`,
+    settings,
+  });
+  if (sentViaResend) return true;
+
+  const transporter = createTransporter(settings);
   if (!transporter) return false;
 
   await transporter.sendMail({
-    from: process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER,
+    from:
+      settings.contactFromEmail ||
+      process.env.CONTACT_FROM_EMAIL ||
+      settings.smtpUser ||
+      process.env.SMTP_USER ||
+      process.env.EMAIL_USER,
     to: email,
     subject: "Admin verification code",
     text: `Your admin verification code is: ${code}. It expires in 10 minutes.`,
@@ -179,7 +272,7 @@ router.delete("/admins/:id", auth, async (req, res) => {
 
 router.post("/admin/signup", async (req, res) => {
   try {
-    if (String(process.env.DISABLE_PUBLIC_ADMIN_SIGNUP || "false").toLowerCase() === "true") {
+    if (String(process.env.DISABLE_PUBLIC_ADMIN_SIGNUP || "true").toLowerCase() === "true") {
       return res.status(403).json({ message: "Admin signup is disabled." });
     }
     await ensureSeedAdmins();
@@ -414,7 +507,7 @@ router.post("/admin/forgot-password", async (req, res) => {
 
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      return res.json({ message: "If this email exists, a reset link has been sent." });
+      return res.json({ message: "If this email exists, a reset code has been sent." });
     }
 
     const resetCode = generateVerificationCode();
@@ -425,25 +518,41 @@ router.post("/admin/forgot-password", async (req, res) => {
     admin.resetPasswordExpiresAt = expiresAt;
     await admin.save();
 
-    const transporter = createTransporter();
-    if (!transporter) {
-      if (process.env.NODE_ENV !== "production") {
-        return res.json({
-          message: "SMTP is not configured. Use this reset code locally.",
-          resetCode,
-        });
-      }
-      return res
-        .status(500)
-        .json({ message: "Email is not configured. Set SMTP credentials in server .env." });
-    }
-
-    await transporter.sendMail({
-      from: process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || process.env.EMAIL_USER,
+    const settings = await getEmailSettings();
+    const resetText = `Your password reset code is: ${resetCode}. It expires in 15 minutes.`;
+    const sentViaResend = await sendWithResend({
       to: admin.email,
       subject: "Admin password reset",
-      text: `Your password reset code is: ${resetCode}. It expires in 15 minutes.`,
+      text: resetText,
+      settings,
     });
+
+    if (!sentViaResend) {
+      const transporter = createTransporter(settings);
+      if (!transporter) {
+        if (process.env.NODE_ENV !== "production") {
+          return res.json({
+            message: "Email is not configured. Use this reset code locally.",
+            resetCode,
+          });
+        }
+        return res
+          .status(500)
+          .json({ message: "Email is not configured. Set SMTP credentials in server .env." });
+      }
+
+      await transporter.sendMail({
+        from:
+          settings.contactFromEmail ||
+          process.env.CONTACT_FROM_EMAIL ||
+          settings.smtpUser ||
+          process.env.SMTP_USER ||
+          process.env.EMAIL_USER,
+        to: admin.email,
+        subject: "Admin password reset",
+        text: resetText,
+      });
+    }
 
     return res.json({ message: "If this email exists, a reset code has been sent." });
   } catch (error) {
