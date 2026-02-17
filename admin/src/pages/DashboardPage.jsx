@@ -260,7 +260,15 @@ const mergeSlides = (incoming = [], fallback = []) => {
   if (safeIncoming.length === 0) return safeFallback;
   const merged = safeFallback.map((fb) => {
     const match = safeIncoming.find((slide) => String(slide.id) === String(fb.id));
-    return match ? { ...fb, ...match } : fb;
+    if (!match) return fb;
+    return {
+      ...fb,
+      ...match,
+      image: match.image && String(match.image).trim() ? match.image : fb.image,
+      title: match.title && String(match.title).trim() ? match.title : fb.title,
+      subtitle: match.subtitle && String(match.subtitle).trim() ? match.subtitle : fb.subtitle,
+      text: match.text && String(match.text).trim() ? match.text : fb.text,
+    };
   });
   const extras = safeIncoming.filter(
     (slide) => !safeFallback.find((fb) => String(fb.id) === String(slide.id))
